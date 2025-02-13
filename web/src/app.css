@@ -2,18 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-.grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
+/* Add custom scrollbar for textareas */
+textarea::-webkit-scrollbar {
+    width: 6px;
   }
-  textarea {
-    width: 100%;
+  
+  textarea::-webkit-scrollbar-track {
+    background: #f1f1f1;
   }
-  img {
-    max-width: 100%;
-    height: auto;
-  }
-  .metadata {
-    margin-top: 1rem;
+  
+  textarea::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
   }

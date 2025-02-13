@@ -1,10 +1,12 @@
 <script>
   import { onMount } from "svelte";
 
+  let serverAddress = "http://localhost:8188"; // Default server address
+  let clientId;
+  let ws;
   let imageUrl = "";
   let status = "Ready";
-  let clientId = "";
-  let serverAddress = "http://localhost:8188";
+  let promptId;
 
   // Form bindings
   let positivePrompt = "Hyperrealistic image of...";
@@ -163,110 +165,86 @@
     e.preventDefault();
     status = "Generating...";
 
-    // Enqueue prompt via HTTP
-    const apiUrl = new URL(serverAddress);
-    const queueUrl = `${apiUrl.origin}/prompt`;
-    const prompt = structuredClone(promptTemplate);
-
     try {
+      // Prepare prompt
+      const apiUrl = new URL(serverAddress);
+      const prompt = structuredClone(promptTemplate);
+      prompt["6"].inputs.text = positivePrompt;
+      prompt["33"].inputs.text = negativePrompt;
+      prompt["31"].inputs.seed = seed;
+      prompt["30"].inputs.ckpt_name = selectedModel;
+
       // Queue prompt
-      const response = await fetch(queueUrl, {
+      const queueResponse = await fetch(`${apiUrl.origin}/prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, client_id: clientId }),
       });
-      const { prompt_id } = await response.json();
+      promptId = (await queueResponse.json()).prompt_id;
 
-      // Test WebSocket connection
-      if (await testWebSocketConnection(apiUrl)) {
-        await waitForWebSocketMessage(prompt_id, apiUrl);
+      // Determine connection method
+      if (apiUrl.hostname === "localhost" || apiUrl.hostname === "127.0.0.1") {
+        await waitForWebSocketCompletion(apiUrl);
       } else {
-        await pollForCompletion(prompt_id, apiUrl);
+        await pollForCompletion(promptId, apiUrl);
       }
 
-      // Fetch image
-      const historyResponse = await fetch(
-        `${apiUrl.origin}/history/${prompt_id}`
-      );
+      // Fetch image data
+      const historyResponse = await fetch(`${apiUrl.origin}/history/${promptId}`);
       const history = await historyResponse.json();
-      const imgData = history[prompt_id]?.outputs?.["9"]?.images?.[0];
-      imageUrl = `${apiUrl.origin}/view?filename=${imgData.filename}&subfolder=${encodeURIComponent(imgData.subfolder)}&type=${imgData.type}`;
-      status = "Ready";
+      const imgData = history[promptId]?.outputs?.["9"]?.images?.[0];
+
+      if (imgData && imgData.filename) {
+        imageUrl = `${apiUrl.origin}/view?filename=${imgData.filename}&subfolder=${encodeURIComponent(
+          imgData.subfolder
+        )}&type=${imgData.type}`;
+        status = "Ready";
+      } else {
+        throw new Error("Image data not found");
+      }
     } catch (err) {
       status = `Error: ${err.message}`;
     }
   }
 
-  // Test WebSocket connection
-  async function testWebSocketConnection(apiUrl) {
-    return new Promise((resolve) => {
-      const wsProtocol = apiUrl.protocol === "https:" ? "wss" : "ws";
-      const wsUrl = `${wsProtocol}://${apiUrl.host}/ws?clientId=${crypto.randomUUID()}`;
-
-      const socket = new WebSocket(wsUrl);
-
-      socket.onopen = () => {
-        socket.close();
-        resolve(true);
-      };
-
-      socket.onerror = () => {
-        resolve(false);
-      };
-
-      setTimeout(() => {
-        socket.close();
-        resolve(false);
-      }, 2000);
-    });
-  }
-
-  // Wait for WebSocket message
-  async function waitForWebSocketMessage(promptId, apiUrl) {
+  async function waitForWebSocketCompletion(apiUrl) {
     return new Promise((resolve, reject) => {
       const wsProtocol = apiUrl.protocol === "https:" ? "wss" : "ws";
       const wsUrl = `${wsProtocol}://${apiUrl.host}/ws?clientId=${clientId}`;
-      const socket = new WebSocket(wsUrl);
 
-      socket.onmessage = (e) => {
+      ws = new WebSocket(wsUrl);
+
+      ws.onmessage = (e) => {
         const msg = JSON.parse(e.data);
-        if (msg.type === "executing" && msg.data.prompt_id === promptId) {
+        if (msg.type === "executed" && msg.data.node === "9") { // Check SaveImage node
+          ws.close();
           resolve();
         }
       };
 
-      socket.onerror = (err) => reject(err);
-      socket.onclose = () => reject(new Error("WebSocket closed"));
+      ws.onerror = reject;
     });
   }
 
-  // Poll for completion
   async function pollForCompletion(promptId, apiUrl) {
-    return new Promise((resolve, reject) => {
-      let attempts = 0;
-      const maxAttempts = 30;
+    let attempts = 0;
+    const maxAttempts = 60; // 2-minute timeout
 
-      const interval = setInterval(async () => {
-        attempts++;
-        try {
-          const historyResponse = await fetch(
-            `${apiUrl.origin}/history/${promptId}`
-          );
-          const history = await historyResponse.json();
-          if (history[promptId]?.outputs?.["9"]?.images?.[0]) {
-            clearInterval(interval);
-            resolve();
-          }
-        } catch (err) {
-          // ignore errors
-        }
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      attempts++;
 
-        if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          reject(new Error("Polling timeout"));
+      try {
+        const historyResponse = await fetch(`${apiUrl.origin}/history/${promptId}`);
+        const history = await historyResponse.json();
+        if (history[promptId]?.outputs?.["9"]?.images?.[0]) {
+          return;
         }
-      }, 2000);
-    });
+      } catch (err) {
+        // Ignore polling errors
+      }
+    }
+    throw new Error("Generation timed out");
   }
 </script>
 

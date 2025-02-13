@@ -1,9 +1,10 @@
 <script>
   import { onMount } from "svelte";
-  let clientId;
-  let ws;
+
   let imageUrl = "";
   let status = "Ready";
+  let clientId = "";
+  let serverAddress = "http://localhost:8188";
 
   // Form bindings
   let positivePrompt = "Hyperrealistic image of...";
@@ -17,235 +18,255 @@
   const modelOptions = [
     "NewReality_FLUXS1D_Alpha2.safetensors",
     "RealisticModel.safetensors",
-    "DreamlikeModel.safetensors"
+    "DreamlikeModel.safetensors",
   ];
 
   const sizeOptions = [
     { label: "1024x1024", width: 1024, height: 1024 },
     { label: "512x512", width: 512, height: 512 },
-    { label: "800x600", width: 800, height: 600 }
+    { label: "800x600", width: 800, height: 600 },
   ];
 
   // Load your workflow JSON
   let promptTemplate = {
-  "6": {
-    "inputs": {
-      "text": "A young woman with long dark hair stands in a snowy forest",
-      "clip": [
-        "38",
-        0
-      ]
+    "6": {
+      inputs: {
+        text: "A young woman with long dark hair stands in a snowy forest",
+        clip: ["38", 0],
+      },
+      class_type: "CLIPTextEncode",
+      _meta: {
+        title: "CLIP Text Encode (Positive Prompt)",
+      },
     },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Positive Prompt)"
-    }
-  },
-  "8": {
-    "inputs": {
-      "samples": [
-        "31",
-        0
-      ],
-      "vae": [
-        "39",
-        0
-      ]
+    "8": {
+      inputs: {
+        samples: ["31", 0],
+        vae: ["39", 0],
+      },
+      class_type: "VAEDecode",
+      _meta: {
+        title: "VAE Decode",
+      },
     },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "VAE Decode"
-    }
-  },
-  "9": {
-    "inputs": {
-      "filename_prefix": "ComfyUI",
-      "images": [
-        "8",
-        0
-      ]
+    "9": {
+      inputs: {
+        filename_prefix: "ComfyUI",
+        images: ["8", 0],
+      },
+      class_type: "SaveImage",
+      _meta: {
+        title: "Save Image",
+      },
     },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "Save Image"
-    }
-  },
-  "30": {
-    "inputs": {
-      "ckpt_name": "NewReality_FLUXS1D_Alpha2.safetensors"
+    "30": {
+      inputs: {
+        ckpt_name: "NewReality_FLUXS1D_Alpha2.safetensors",
+      },
+      class_type: "CheckpointLoaderSimple",
+      _meta: {
+        title: "Load Checkpoint",
+      },
     },
-    "class_type": "CheckpointLoaderSimple",
-    "_meta": {
-      "title": "Load Checkpoint"
-    }
-  },
-  "31": {
-    "inputs": {
-      "seed": 646960540499716,
-      "steps": 20,
-      "cfg": 1,
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "denoise": 1,
-      "model": [
-        "37",
-        0
-      ],
-      "positive": [
-        "35",
-        0
-      ],
-      "negative": [
-        "33",
-        0
-      ],
-      "latent_image": [
-        "40",
-        4
-      ]
+    "31": {
+      inputs: {
+        seed: 646960540499716,
+        steps: 20,
+        cfg: 3.5,
+        sampler_name: "euler",
+        scheduler: "simple",
+        denoise: 1,
+        model: ["37", 0],
+        positive: ["35", 0],
+        negative: ["33", 0],
+        latent_image: ["40", 4],
+      },
+      class_type: "KSampler",
+      _meta: {
+        title: "KSampler",
+      },
     },
-    "class_type": "KSampler",
-    "_meta": {
-      "title": "KSampler"
-    }
-  },
-  "33": {
-    "inputs": {
-      "text": "",
-      "clip": [
-        "38",
-        0
-      ]
+    "33": {
+      inputs: {
+        text: "",
+        clip: ["38", 0],
+      },
+      class_type: "CLIPTextEncode",
+      _meta: {
+        title: "CLIP Text Encode (Negative Prompt)",
+      },
     },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Negative Prompt)"
-    }
-  },
-  "35": {
-    "inputs": {
-      "guidance": 3.5,
-      "conditioning": [
-        "6",
-        0
-      ]
+    "35": {
+      inputs: {
+        guidance: 3.5,
+        conditioning: ["6", 0],
+      },
+      class_type: "FluxGuidance",
+      _meta: {
+        title: "FluxGuidance",
+      },
     },
-    "class_type": "FluxGuidance",
-    "_meta": {
-      "title": "FluxGuidance"
-    }
-  },
-  "37": {
-    "inputs": {
-      "max_shift": 1.15,
-      "base_shift": 0.5,
-      "width": [
-        "40",
-        0
-      ],
-      "height": [
-        "40",
-        1
-      ],
-      "model": [
-        "30",
-        0
-      ]
+    "37": {
+      inputs: {
+        max_shift: 1.15,
+        base_shift: 0.5,
+        width: ["40", 0],
+        height: ["40", 1],
+        model: ["30", 0],
+      },
+      class_type: "ModelSamplingFlux",
+      _meta: {
+        title: "ModelSamplingFlux",
+      },
     },
-    "class_type": "ModelSamplingFlux",
-    "_meta": {
-      "title": "ModelSamplingFlux"
-    }
-  },
-  "38": {
-    "inputs": {
-      "clip_name1": "clip_l.safetensors",
-      "clip_name2": "t5xxl_fp8_e4m3fn.safetensors",
-      "type": "flux"
+    "38": {
+      inputs: {
+        clip_name1: "clip_l.safetensors",
+        clip_name2: "t5xxl_fp8_e4m3fn.safetensors",
+        type: "flux",
+      },
+      class_type: "DualCLIPLoader",
+      _meta: {
+        title: "DualCLIPLoader",
+      },
     },
-    "class_type": "DualCLIPLoader",
-    "_meta": {
-      "title": "DualCLIPLoader"
-    }
-  },
-  "39": {
-    "inputs": {
-      "vae_name": "FLUX_vae.safetensors"
+    "39": {
+      inputs: {
+        vae_name: "FLUX_vae.safetensors",
+      },
+      class_type: "VAELoader",
+      _meta: {
+        title: "Load VAE",
+      },
     },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
-    }
-  },
-  "40": {
-    "inputs": {
-      "width": 1024,
-      "height": 1024,
-      "aspect_ratio": "custom",
-      "swap_dimensions": "Off",
-      "upscale_factor": 1,
-      "batch_size": 1
+    "40": {
+      inputs: {
+        width: 1024,
+        height: 1024,
+        aspect_ratio: "custom",
+        swap_dimensions: "Off",
+        upscale_factor: 1,
+        batch_size: 1,
+      },
+      class_type: "CR SDXL Aspect Ratio",
+      _meta: {
+        title: "🔳 CR SDXL Aspect Ratio",
+      },
     },
-    "class_type": "CR SDXL Aspect Ratio",
-    "_meta": {
-      "title": "🔳 CR SDXL Aspect Ratio"
-    }
-  }
-}
+  };
 
   onMount(() => {
     clientId = crypto.randomUUID();
-    connectWebSocket();
   });
-
-  function connectWebSocket() {
-    ws = new WebSocket(`ws://127.0.0.1:8188/ws?clientId=${clientId}`);
-
-    ws.onmessage = async (e) => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === "executing" && msg.data.node === null) {
-        status = "Fetching image...";
-        const history = await getHistory(msg.data.prompt_id);
-        const imgData = history[msg.data.prompt_id].outputs["9"].images[0];
-        imageUrl = `http://127.0.0.1:8188/view?filename=${
-          imgData.filename
-        }&subfolder=${encodeURIComponent(imgData.subfolder)}&type=${imgData.type}`;
-        status = "Ready";
-      }
-    };
-  }
-
-  async function queuePrompt(prompt) {
-    const response = await fetch("http://127.0.0.1:8188/prompt", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, client_id: clientId }),
-    });
-    return await response.json();
-  }
-
-  async function getHistory(promptId) {
-    const response = await fetch(`http://127.0.0.1:8188/history/${promptId}`);
-    return await response.json();
-  }
 
   async function generateImage(e) {
     e.preventDefault();
     status = "Generating...";
 
+    // Enqueue prompt via HTTP
+    const apiUrl = new URL(serverAddress);
+    const queueUrl = `${apiUrl.origin}/prompt`;
     const prompt = structuredClone(promptTemplate);
-    prompt["6"].inputs.text = positivePrompt;
-    prompt["33"].inputs.text = negativePrompt;
-    prompt["31"].inputs.seed = seed;
-    prompt["30"].inputs.ckpt_name = selectedModel; // Update model
-    prompt["40"].inputs.width = parseInt(selectedSize.split('x')[0]);
-    prompt["40"].inputs.height = parseInt(selectedSize.split('x')[1]);
 
     try {
-      const { prompt_id } = await queuePrompt(prompt);
+      // Queue prompt
+      const response = await fetch(queueUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, client_id: clientId }),
+      });
+      const { prompt_id } = await response.json();
+
+      // Test WebSocket connection
+      if (await testWebSocketConnection(apiUrl)) {
+        await waitForWebSocketMessage(prompt_id, apiUrl);
+      } else {
+        await pollForCompletion(prompt_id, apiUrl);
+      }
+
+      // Fetch image
+      const historyResponse = await fetch(
+        `${apiUrl.origin}/history/${prompt_id}`
+      );
+      const history = await historyResponse.json();
+      const imgData = history[prompt_id]?.outputs?.["9"]?.images?.[0];
+      imageUrl = `${apiUrl.origin}/view?filename=${imgData.filename}&subfolder=${encodeURIComponent(imgData.subfolder)}&type=${imgData.type}`;
+      status = "Ready";
     } catch (err) {
       status = `Error: ${err.message}`;
     }
+  }
+
+  // Test WebSocket connection
+  async function testWebSocketConnection(apiUrl) {
+    return new Promise((resolve) => {
+      const wsProtocol = apiUrl.protocol === "https:" ? "wss" : "ws";
+      const wsUrl = `${wsProtocol}://${apiUrl.host}/ws?clientId=${crypto.randomUUID()}`;
+
+      const socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        socket.close();
+        resolve(true);
+      };
+
+      socket.onerror = () => {
+        resolve(false);
+      };
+
+      setTimeout(() => {
+        socket.close();
+        resolve(false);
+      }, 2000);
+    });
+  }
+
+  // Wait for WebSocket message
+  async function waitForWebSocketMessage(promptId, apiUrl) {
+    return new Promise((resolve, reject) => {
+      const wsProtocol = apiUrl.protocol === "https:" ? "wss" : "ws";
+      const wsUrl = `${wsProtocol}://${apiUrl.host}/ws?clientId=${clientId}`;
+      const socket = new WebSocket(wsUrl);
+
+      socket.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === "executing" && msg.data.prompt_id === promptId) {
+          resolve();
+        }
+      };
+
+      socket.onerror = (err) => reject(err);
+      socket.onclose = () => reject(new Error("WebSocket closed"));
+    });
+  }
+
+  // Poll for completion
+  async function pollForCompletion(promptId, apiUrl) {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 30;
+
+      const interval = setInterval(async () => {
+        attempts++;
+        try {
+          const historyResponse = await fetch(
+            `${apiUrl.origin}/history/${promptId}`
+          );
+          const history = await historyResponse.json();
+          if (history[promptId]?.outputs?.["9"]?.images?.[0]) {
+            clearInterval(interval);
+            resolve();
+          }
+        } catch (err) {
+          // ignore errors
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          reject(new Error("Polling timeout"));
+        }
+      }, 2000);
+    });
   }
 </script>
 
@@ -255,6 +276,19 @@
     <div class="w-full md:w-1/2 space-y-6">
       <div class="card bg-base-100 shadow-xl p-6">
         <h2 class="text-xl font-bold mb-4">Generation Settings</h2>
+
+        <!-- Server Address Input -->
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text font-semibold">Server Address</span>
+          </label>
+          <input
+            type="text"
+            bind:value={serverAddress}
+            class="input input-bordered w-full"
+            placeholder="http://localhost:8188 or https://your-tunnel.cloudflareaccess.com"
+          />
+        </div>
 
         <!-- Model Selection -->
         <div class="form-control">
@@ -270,15 +304,15 @@
             {/each}
           </select>
         </div>
-        
+
         <!-- Positive Prompt -->
         <div class="form-control">
           <label class="label">
             <span class="label-text font-semibold">Positive Prompt</span>
           </label>
-          <textarea 
-            bind:value={positivePrompt} 
-            rows="4" 
+          <textarea
+            bind:value={positivePrompt}
+            rows="4"
             class="textarea textarea-bordered textarea-lg w-full"
             placeholder="Describe what you want to generate..."
           />
@@ -297,70 +331,72 @@
           />
         </div>
 
-<!-- Parameters Grid -->
-<div class="grid grid-cols-1 md:grid-cols-1 gap-4 mt-6">
-  <div class="form-control">
-    <label class="label">
-      <span class="label-text">Seed</span>
-    </label>
-    <input 
-      type="number" 
-      bind:value={seed}
-      class="input input-bordered w-full"
-    />
-  </div>
+        <!-- Parameters Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-1 gap-4 mt-6">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Seed</span>
+            </label>
+            <input
+              type="number"
+              bind:value={seed}
+              class="input input-bordered w-full"
+            />
+          </div>
 
-  <div class="form-control">
-    <label class="label">
-      <span class="label-text">Steps ({steps})</span>
-    </label>
-    <input
-      type="range"
-      bind:value={steps}
-      min="1"
-      max="50"
-      class="range range-primary"
-    />
-  </div>
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Steps ({steps})</span>
+            </label>
+            <input
+              type="range"
+              bind:value={steps}
+              min="1"
+              max="50"
+              class="range range-primary"
+            />
+          </div>
 
-  <div class="form-control">
-    <label class="label">
-      <span class="label-text">CFG Scale ({cfg})</span>
-    </label>
-    <input
-      type="range"
-      bind:value={cfg}
-      min="1"
-      max="20"
-      step="0.5"
-      class="range range-secondary"
-    />
-  </div>
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">CFG Scale ({cfg})</span>
+            </label>
+            <input
+              type="range"
+              bind:value={cfg}
+              min="1"
+              max="20"
+              step="0.5"
+              class="range range-secondary"
+            />
+          </div>
 
-  <!-- Image Size -->
-  <div class="form-control">
-    <label class="label">
-      <span class="label-text font-semibold">Image Size</span>
-    </label>
-    <select
-      bind:value={selectedSize}
-      class="select select-bordered w-full max-w-xs"
-    >
-      {#each sizeOptions as option}
-        <option value={`${option.width}x${option.height}`}>{option.label}</option>
-      {/each}
-    </select>
-  </div>
-</div>
+          <!-- Image Size -->
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-semibold">Image Size</span>
+            </label>
+            <select
+              bind:value={selectedSize}
+              class="select select-bordered w-full max-w-xs"
+            >
+              {#each sizeOptions as option}
+                <option value={`${option.width}x${option.height}`}
+                  >{option.label}</option
+                >
+              {/each}
+            </select>
+          </div>
+        </div>
 
         <!-- Generate Button -->
         <div class="mt-6">
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             class="btn btn-primary w-full"
-            disabled={status !== 'Ready'}
+            disabled={status !== "Ready"}
           >
-            {#if status === 'Generating...'}
+            {#if status === "Generating..."}
               <span class="loading loading-spinner"></span>
               Generating
             {:else}
@@ -383,21 +419,22 @@
           <!-- Image Preview -->
           {#if imageUrl}
             <figure class="flex-1 bg-neutral rounded-box overflow-hidden">
-              <img 
-                src={imageUrl} 
-                alt="Generated image" 
+              <img
+                src={imageUrl}
+                alt="Generated image"
                 class="w-full h-auto object-contain"
               />
             </figure>
 
             <!-- Metadata Collapse -->
             <div class="collapse collapse-arrow mt-4">
-              <input type="checkbox" /> 
+              <input type="checkbox" />
               <div class="collapse-title text-sm font-medium">
                 Show Generation Details
               </div>
-              <div class="collapse-content"> 
-                <pre class="text-xs whitespace-pre-wrap p-2 bg-base-200 rounded-box">{`
+              <div class="collapse-content">
+                <pre
+                  class="text-xs whitespace-pre-wrap p-2 bg-base-200 rounded-box">{`
 Positive: ${positivePrompt}
 Negative: ${negativePrompt}
 Seed: ${seed}
@@ -408,7 +445,9 @@ CFG Scale: ${cfg}
             </div>
           {:else}
             <!-- Placeholder -->
-            <div class="flex-1 bg-neutral rounded-box flex items-center justify-center">
+            <div
+              class="flex-1 bg-neutral rounded-box flex items-center justify-center"
+            >
               <span class="text-neutral-content text-opacity-50">
                 Image will appear here
               </span>

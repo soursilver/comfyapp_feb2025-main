@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
 
-  let serverAddress = "http://localhost:8188"; // Default server address
+  let serverAddress = "http://127.0.0.1:8188"; // Default server address
   let clientId;
   let ws;
   let imageUrl = "";
@@ -9,10 +9,10 @@
   let promptId;
 
   // Form bindings
-  let positivePrompt = "Hyperrealistic image of...";
+  let positivePrompt = "Hyperrealistic image of futuristic cyborg in a cornfield";
   let negativePrompt = "lowres, bad anatomy...";
   let seed = Math.floor(Math.random() * 1000000000);
-  let steps = 25;
+  let steps = 15;
   let cfg = 3.5;
   let selectedModel = "NewReality_FLUXS1D_Alpha2.safetensors";
   let selectedSize = "1024x1024";
@@ -172,7 +172,12 @@
       prompt["6"].inputs.text = positivePrompt;
       prompt["33"].inputs.text = negativePrompt;
       prompt["31"].inputs.seed = seed;
+      prompt["31"].inputs.steps = steps;
+      prompt["31"].inputs.cfg = cfg;
       prompt["30"].inputs.ckpt_name = selectedModel;
+      prompt["40"].inputs.width = selectedSize.split("x")[0];
+      prompt["40"].inputs.height = selectedSize.split("x")[1];
+
 
       // Queue prompt
       const queueResponse = await fetch(`${apiUrl.origin}/prompt`, {
@@ -228,7 +233,7 @@
 
   async function pollForCompletion(promptId, apiUrl) {
     let attempts = 0;
-    const maxAttempts = 60; // 2-minute timeout
+    const maxAttempts = 500; // 2-minute timeout
 
     while (attempts < maxAttempts) {
       await new Promise(resolve => setTimeout(resolve, 2000));

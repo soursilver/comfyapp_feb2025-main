@@ -1,12 +1,17 @@
 <script>
   import { onMount } from "svelte";
 
-  export let serverAddress = ""; // Default server address
+  // props
+  export let useUnetModels = false;
+  export let serverAddress = "";
+  
+  // variables
   let clientId;
   let ws;
   let imageUrl = "";
   let status = "Ready";
   let promptId;
+  
 
   // Form bindings
   let positivePrompt =
@@ -187,8 +192,13 @@
     try {
       const response = await fetch(`${serverAddress}/object_info`);
       const data = await response.json();
-      modelOptions =
-        data.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+      
+      // Changed lines: Use different path based on useUnetModels
+      const modelPath = useUnetModels 
+        ? "UNETLoader.input.required.unet_name[0]"
+        : "CheckpointLoaderSimple.input.required.ckpt_name[0]";
+      
+      modelOptions = getNestedProperty(data, modelPath) || [];
     } catch (error) {
       console.error("Error loading models:", error);
       modelOptions = ["DefaultModel.safetensors"];
@@ -196,6 +206,19 @@
       loadingModels = false;
     }
   }
+
+  // Add helper function to access nested properties
+  function getNestedProperty(obj, path) {
+  return path.split('.').reduce((acc, part) => {
+    const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+    if (arrayMatch) {
+      const prop = arrayMatch[1];
+      const index = parseInt(arrayMatch[2]);
+      return acc && acc[prop] && acc[prop][index];
+    }
+    return acc && acc[part];
+  }, obj);
+}
 
   async function generateImage(e) {
     e.preventDefault();
@@ -300,25 +323,21 @@
       <div class="card bg-base-100 shadow-xl p-6">
         <h2 class="text-xl font-bold mb-4">Generation Settings</h2>
 
-        <!-- Server Address Input -->
+        <!-- Server Address -->
         <div class="form-control">
-          <label class="label">
-            <span class="label-text font-semibold">Server Address</span>
+          <label class="label" for="serverAddress">
+            <span class="label-text font-semibold">Server: {serverAddress}</span
+            >
           </label>
-          <input
-            type="text"
-            bind:value={serverAddress}
-            class="input input-bordered w-full"
-            placeholder="http://localhost:8188 or https://your-tunnel.cloudflareaccess.com"
-          />
         </div>
 
         <!-- Model Selection -->
         <div class="form-control">
-          <label class="label">
+          <label class="label" for="modelSelection">
             <span class="label-text font-semibold">Model</span>
           </label>
           <select
+            id="modelSelection"
             bind:value={selectedModel}
             class="select select-bordered w-full max-w-xs"
             disabled={loadingModels}
@@ -334,10 +353,11 @@
 
         <!-- Positive Prompt -->
         <div class="form-control">
-          <label class="label">
+          <label class="label" for="positive-prompt">
             <span class="label-text font-semibold">Positive Prompt</span>
           </label>
           <textarea
+            id="positive-prompt"
             bind:value={positivePrompt}
             rows="4"
             class="textarea textarea-bordered textarea-lg w-full"
@@ -347,10 +367,11 @@
 
         <!-- Negative Prompt -->
         <div class="form-control mt-4">
-          <label class="label">
+          <label class="label" for="negative-prompt">
             <span class="label-text font-semibold">Negative Prompt</span>
           </label>
           <textarea
+            id="negative-prompt"
             bind:value={negativePrompt}
             rows="4"
             class="textarea textarea-bordered textarea-lg w-full"
@@ -361,10 +382,11 @@
         <!-- Parameters Grid -->
         <div class="grid grid-cols-1 md:grid-cols-1 gap-4 mt-6">
           <div class="form-control">
-            <label class="label">
+            <label class="label" for="seed">
               <span class="label-text">Seed</span>
             </label>
             <input
+              id="seed"
               type="number"
               bind:value={seed}
               class="input input-bordered w-full"
@@ -372,10 +394,11 @@
           </div>
 
           <div class="form-control">
-            <label class="label">
+            <label class="label" for="steps">
               <span class="label-text">Steps ({steps})</span>
             </label>
             <input
+              id="steps"
               type="range"
               bind:value={steps}
               min="1"
@@ -385,10 +408,11 @@
           </div>
 
           <div class="form-control">
-            <label class="label">
+            <label class="label" for="cfg">
               <span class="label-text">CFG Scale ({cfg})</span>
             </label>
             <input
+              id="cfg"
               type="range"
               bind:value={cfg}
               min="1"
@@ -400,10 +424,11 @@
 
           <!-- Image Size -->
           <div class="form-control">
-            <label class="label">
+            <label class="label" for="imageSize">
               <span class="label-text font-semibold">Image Size</span>
             </label>
             <select
+              id="imageSize"
               bind:value={selectedSize}
               class="select select-bordered w-full max-w-xs"
             >
@@ -448,7 +473,7 @@
             <figure class="flex-1 bg-neutral rounded-box overflow-hidden">
               <img
                 src={imageUrl}
-                alt="Generated image"
+                alt="Generated"
                 class="w-full h-auto object-contain"
               />
             </figure>

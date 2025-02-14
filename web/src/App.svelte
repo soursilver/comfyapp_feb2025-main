@@ -4,6 +4,7 @@
   import Settings from "./Settings.svelte";
 
   let serverAddress = "http://localhost:8188";
+  let useUnetModels = false; // Add state
   let showSettings = false;
 
   function toggleSettings() {
@@ -11,8 +12,8 @@
   }
 
   function handleSave(event) {
-    // Extract new address from event detail
-    serverAddress = event.detail;
+    serverAddress = event.detail.address;
+    useUnetModels = event.detail.useUnet; // Update state
     showSettings = false;
   }
 </script>
@@ -29,10 +30,10 @@
       <Settings
         on:save={handleSave}
         currentAddress={serverAddress}
+        useUnetModels={useUnetModels}
         className="z-20"
       />
     {/if}
-    <MainForm {serverAddress} key={serverAddress} />
-    <!-- Add key prop -->
+    <MainForm {serverAddress} useUnetModels={useUnetModels} key={serverAddress + useUnetModels} />
   </main>
 </div>

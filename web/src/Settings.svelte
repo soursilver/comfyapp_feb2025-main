@@ -4,19 +4,24 @@
   
     export let currentAddress = "";
     export let className = "";
+    export let useUnetModels = false; // Add new prop
   
     let newAddress = currentAddress;
+    let newUseUnetModels = useUnetModels; // Local copy
     let saving = false;
   
     function handleSave() {
-      if (!newAddress.trim()) return;
-  
-      saving = true;
-      dispatch("save", newAddress); // Use Svelte's dispatch
-      setTimeout(() => {
-        saving = false;
-      }, 1000);
-    }
+    if (!newAddress.trim()) return;
+
+    saving = true;
+    dispatch("save", { 
+      address: newAddress,
+      useUnet: newUseUnetModels 
+    });
+    setTimeout(() => {
+      saving = false;
+    }, 1000);
+  }
   </script>
 
 <div class="fixed inset-0 flex items-center justify-center z-50 p-8">
@@ -33,16 +38,28 @@
         placeholder="http://localhost:8188 or https://your-tunnel.com"
       />
     </div>
+    <!-- UNET Toggle -->
+    <div class="form-control">
+        <label class="label cursor-pointer justify-start gap-4">
+          <input
+            type="checkbox"
+            bind:checked={newUseUnetModels}
+            class="toggle toggle-primary"
+          />
+          <span class="label-text">Use UNet Models</span>
+        </label>
+      </div>
+    <!-- Save Button -->
     <div class="mt-6">
-      <button
-        on:click={handleSave}
-        class="btn btn-primary w-full"
-        disabled={saving}
-      >
-        {saving
-          ? '<span class="loading loading-spinner"></span> Saving...'
-          : "Save"}
-      </button>
-    </div>
+        <button
+          on:click={handleSave}
+          class="btn btn-primary w-full"
+          disabled={saving}
+        >
+          {saving
+            ? '<span class="loading loading-spinner"></span> Saving...'
+            : "Save"}
+        </button>
+      </div>
   </div>
 </div>

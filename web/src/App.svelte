@@ -3,7 +3,7 @@
   import MainForm from "./MainForm.svelte";
   import Settings from "./Settings.svelte";
 
-  let serverAddress = "http://localhost:8188";
+  let serverAddress = "http://127.0.0.1:8188";
   let useUnetModels = false; // Add state
   let showSettings = false;
 
@@ -13,7 +13,7 @@
 
   function handleSave(event) {
     serverAddress = event.detail.address;
-    useUnetModels = event.detail.useUnet; // Update state
+    useUnetModels = event.detail.useUnet;
     showSettings = false;
   }
 </script>
@@ -34,6 +34,10 @@
         className="z-20"
       />
     {/if}
-    <MainForm {serverAddress} useUnetModels={useUnetModels} key={serverAddress + useUnetModels} />
+    <MainForm 
+      {serverAddress} 
+      {useUnetModels} 
+      key={serverAddress + useUnetModels}
+    />
   </main>
 </div>

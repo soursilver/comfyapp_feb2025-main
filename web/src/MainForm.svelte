@@ -182,18 +182,16 @@
   });
 
   // Reactive statement to watch serverAddress changes
-  $: {
-    if (serverAddress) {
-      fetchModels();
-    }
-  }
+  $: serverAddress, useUnetModels, fetchModels();
 
   async function fetchModels() {
+    if (!serverAddress) return;
+    
+    loadingModels = true;
     try {
       const response = await fetch(`${serverAddress}/object_info`);
       const data = await response.json();
       
-      // Changed lines: Use different path based on useUnetModels
       const modelPath = useUnetModels 
         ? "UNETLoader.input.required.unet_name[0]"
         : "CheckpointLoaderSimple.input.required.ckpt_name[0]";

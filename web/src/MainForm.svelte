@@ -1,5 +1,7 @@
 <script>
   import { onMount } from "svelte";
+  import chkptWorkflow from "./workflows/flux_loadcheckpoint.json";
+  import unetWorkflow from "./workflows/flux_loadunet.json";
 
   // props
   export let useUnetModels = false;
@@ -24,6 +26,7 @@
   let loadingModels = true;
   let selectedSize = "1024x1024";
   let modelOptions = [];
+  let currentWorkflow = chkptWorkflow;
 
   let sizeOptions = [
     { label: "1024x1024", width: 1024, height: 1024 },
@@ -31,133 +34,6 @@
     { label: "800x600", width: 800, height: 600 },
   ];
 
-  // Load your workflow JSON
-  let promptTemplate = {
-    "6": {
-      inputs: {
-        text: "A young woman with long dark hair stands in a snowy forest",
-        clip: ["38", 0],
-      },
-      class_type: "CLIPTextEncode",
-      _meta: {
-        title: "CLIP Text Encode (Positive Prompt)",
-      },
-    },
-    "8": {
-      inputs: {
-        samples: ["31", 0],
-        vae: ["39", 0],
-      },
-      class_type: "VAEDecode",
-      _meta: {
-        title: "VAE Decode",
-      },
-    },
-    "9": {
-      inputs: {
-        filename_prefix: "ComfyUI",
-        images: ["8", 0],
-      },
-      class_type: "SaveImage",
-      _meta: {
-        title: "Save Image",
-      },
-    },
-    "30": {
-      inputs: {
-        ckpt_name: "NewReality_FLUXS1D_Alpha2.safetensors",
-      },
-      class_type: "CheckpointLoaderSimple",
-      _meta: {
-        title: "Load Checkpoint",
-      },
-    },
-    "31": {
-      inputs: {
-        seed: 646960540499716,
-        steps: 20,
-        cfg: 3.5,
-        sampler_name: "euler",
-        scheduler: "simple",
-        denoise: 1,
-        model: ["37", 0],
-        positive: ["35", 0],
-        negative: ["33", 0],
-        latent_image: ["40", 4],
-      },
-      class_type: "KSampler",
-      _meta: {
-        title: "KSampler",
-      },
-    },
-    "33": {
-      inputs: {
-        text: "",
-        clip: ["38", 0],
-      },
-      class_type: "CLIPTextEncode",
-      _meta: {
-        title: "CLIP Text Encode (Negative Prompt)",
-      },
-    },
-    "35": {
-      inputs: {
-        guidance: 3.5,
-        conditioning: ["6", 0],
-      },
-      class_type: "FluxGuidance",
-      _meta: {
-        title: "FluxGuidance",
-      },
-    },
-    "37": {
-      inputs: {
-        max_shift: 1.15,
-        base_shift: 0.5,
-        width: ["40", 0],
-        height: ["40", 1],
-        model: ["30", 0],
-      },
-      class_type: "ModelSamplingFlux",
-      _meta: {
-        title: "ModelSamplingFlux",
-      },
-    },
-    "38": {
-      inputs: {
-        clip_name1: "clip_l.safetensors",
-        clip_name2: "t5xxl_fp8_e4m3fn.safetensors",
-        type: "flux",
-      },
-      class_type: "DualCLIPLoader",
-      _meta: {
-        title: "DualCLIPLoader",
-      },
-    },
-    "39": {
-      inputs: {
-        vae_name: "FLUX_vae.safetensors",
-      },
-      class_type: "VAELoader",
-      _meta: {
-        title: "Load VAE",
-      },
-    },
-    "40": {
-      inputs: {
-        width: 1024,
-        height: 1024,
-        aspect_ratio: "custom",
-        swap_dimensions: "Off",
-        upscale_factor: 1,
-        batch_size: 1,
-      },
-      class_type: "CR SDXL Aspect Ratio",
-      _meta: {
-        title: "🔳 CR SDXL Aspect Ratio",
-      },
-    },
-  };
 
   onMount(async () => {
     console.log("Server address:", serverAddress);
@@ -181,8 +57,12 @@
     };
   });
 
-  // Reactive statement to watch serverAddress changes
+  // Reactive statements
   $: serverAddress, useUnetModels, fetchModels();
+  $: {
+    currentWorkflow = useUnetModels ? unetWorkflow : chkptWorkflow;
+    if (useUnetModels) fetchModels(); // Force refresh when toggling
+  }
 
   async function fetchModels() {
     if (!serverAddress) return;
@@ -225,13 +105,20 @@
     try {
       // Prepare prompt
       const apiUrl = new URL(serverAddress);
-      const prompt = structuredClone(promptTemplate);
+      const prompt = structuredClone(currentWorkflow);
+
+      // Update model loading node based on workflow
+      if (useUnetModels) {
+        prompt["41"].inputs.unet_name = selectedModel;
+      } else {
+        prompt["30"].inputs.ckpt_name = selectedModel;
+      }
+
       prompt["6"].inputs.text = positivePrompt;
       prompt["33"].inputs.text = negativePrompt;
       prompt["31"].inputs.seed = seed;
       prompt["31"].inputs.steps = steps;
       prompt["31"].inputs.cfg = cfg;
-      prompt["30"].inputs.ckpt_name = selectedModel;
       prompt["40"].inputs.width = selectedSize.split("x")[0];
       prompt["40"].inputs.height = selectedSize.split("x")[1];
 

@@ -6,14 +6,16 @@
   // props
   export let useUnetModels = false;
   export let serverAddress = "";
-  
+
   // variables
   let clientId;
   let ws;
   let imageUrl = "";
   let status = "Ready";
   let promptId;
-  
+  let history = [];
+  let currentPage = 0;
+  let maxPageIndex = 0;
 
   // Form bindings
   let positivePrompt =
@@ -33,7 +35,6 @@
     { label: "512x512", width: 512, height: 512 },
     { label: "800x600", width: 800, height: 600 },
   ];
-
 
   onMount(async () => {
     console.log("Server address:", serverAddress);
@@ -63,19 +64,31 @@
     currentWorkflow = useUnetModels ? unetWorkflow : chkptWorkflow;
     if (useUnetModels) fetchModels(); // Force refresh when toggling
   }
+  $: prevImages = history.length >= 1 ? history.slice(0, -1).reverse() : [];
+  $: maxPageIndex = Math.ceil(prevImages.length / 3) - 1;
+
+  // New function to handle previous page navigation
+  function handlePrevPage() {
+    currentPage = Math.max(currentPage - 1, 0);
+  }
+
+  // New function to handle next page navigation
+  function handleNextPage() {
+    currentPage = Math.min(currentPage + 1, maxPageIndex);
+  }
 
   async function fetchModels() {
     if (!serverAddress) return;
-    
+
     loadingModels = true;
     try {
       const response = await fetch(`${serverAddress}/object_info`);
       const data = await response.json();
-      
-      const modelPath = useUnetModels 
+
+      const modelPath = useUnetModels
         ? "UNETLoader.input.required.unet_name[0]"
         : "CheckpointLoaderSimple.input.required.ckpt_name[0]";
-      
+
       modelOptions = getNestedProperty(data, modelPath) || [];
     } catch (error) {
       console.error("Error loading models:", error);
@@ -87,16 +100,16 @@
 
   // Add helper function to access nested properties
   function getNestedProperty(obj, path) {
-  return path.split('.').reduce((acc, part) => {
-    const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
-    if (arrayMatch) {
-      const prop = arrayMatch[1];
-      const index = parseInt(arrayMatch[2]);
-      return acc && acc[prop] && acc[prop][index];
-    }
-    return acc && acc[part];
-  }, obj);
-}
+    return path.split(".").reduce((acc, part) => {
+      const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
+      if (arrayMatch) {
+        const prop = arrayMatch[1];
+        const index = parseInt(arrayMatch[2]);
+        return acc && acc[prop] && acc[prop][index];
+      }
+      return acc && acc[part];
+    }, obj);
+  }
 
   async function generateImage(e) {
     e.preventDefault();
@@ -141,13 +154,28 @@
       const historyResponse = await fetch(
         `${apiUrl.origin}/history/${promptId}`
       );
-      const history = await historyResponse.json();
-      const imgData = history[promptId]?.outputs?.["9"]?.images?.[0];
+      const apiHistory = await historyResponse.json();
+      const imgData = apiHistory[promptId]?.outputs?.["9"]?.images?.[0];
 
       if (imgData && imgData.filename) {
         imageUrl = `${apiUrl.origin}/view?filename=${imgData.filename}&subfolder=${encodeURIComponent(
           imgData.subfolder
         )}&type=${imgData.type}`;
+
+        // Update history
+        history = [
+          ...history,
+          {
+            url: imageUrl,
+            positivePrompt: positivePrompt,
+            negativePrompt: negativePrompt,
+            seed: seed,
+            steps: steps,
+            cfg: cfg,
+            size: selectedSize,
+            timestamp: Date.now(),
+          }
+        ];
         status = "Ready";
       } else {
         throw new Error("Image data not found");
@@ -362,6 +390,42 @@
                 class="w-full h-auto object-contain"
               />
             </figure>
+
+            {#if prevImages.length > 0}
+                <div class="mt-4">
+                  <div class="flex items-center justify-between">
+                    <!-- Left Arrow -->
+                    <button
+                      on:click={handlePrevPage}
+                      class="btn btn-circle"
+                      disabled={currentPage === 0}
+                    >
+                      ❰
+                    </button>
+  
+                    <!-- Thumbnails -->
+                    <div class="flex gap-4 overflow-hidden">
+                      {#each prevImages.slice(currentPage * 3, currentPage * 3 + 3) as image}
+                        <div class="tooltip" data-tip={image.positivePrompt}>
+                          <img
+                            src={image.url}
+                            class="h-20 w-20 object-cover rounded-box border-2 border-base-300"
+                          />
+                        </div>
+                      {/each}
+                    </div>
+  
+                    <!-- Right Arrow -->
+                    <button
+                      on:click={handleNextPage}
+                      class="btn btn-circle"
+                      disabled={currentPage === maxPageIndex}
+                    >
+                      ❱
+                    </button>
+                  </div>
+                </div>
+              {/if}
 
             <!-- Metadata Collapse -->
             <div class="collapse collapse-arrow mt-4">

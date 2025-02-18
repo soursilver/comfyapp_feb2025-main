@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import chkptWorkflow from "./workflows/flux_loadcheckpoint.json";
-  import unetWorkflow from "./workflows/flux_loadunet.json";
+  import defaultWorkflow from "./workflows/flux_unet.json";
+  import unetWorkflow from "./workflows/flux_unet_lora.json";
 
   // props
   export let useUnetModels = false;
@@ -20,7 +20,7 @@
   // Form bindings
   let positivePrompt =
     "Hyperrealistic image of futuristic futuristic scene, realistic style";
-  let negativePrompt = "lowres, bad anatomy...";
+  //let negativePrompt = "lowres, bad anatomy...";
   let seed = Math.floor(Math.random() * 1000000000);
   let steps = 15;
   let cfg = 3.5;
@@ -28,10 +28,12 @@
   let loadingModels = true;
   let selectedSize = "1024x1024";
   let modelOptions = [];
-  let currentWorkflow = chkptWorkflow;
+  let currentWorkflow = defaultWorkflow;
 
   let sizeOptions = [
+    { label: "1920x1080", width: 1920, height: 1080 },
     { label: "1024x1024", width: 1024, height: 1024 },
+    { label: "720x1280", width: 720, height: 1280 },
     { label: "512x512", width: 512, height: 512 },
     { label: "800x600", width: 800, height: 600 },
   ];
@@ -61,7 +63,7 @@
   // Reactive statements
   $: serverAddress, useUnetModels, fetchModels();
   $: {
-    currentWorkflow = useUnetModels ? unetWorkflow : chkptWorkflow;
+    currentWorkflow = useUnetModels ? unetWorkflow : defaultWorkflow;
     if (useUnetModels) fetchModels(); // Force refresh when toggling
   }
   $: prevImages = history.length >= 1 ? history.slice(0, -1).reverse() : [];
@@ -87,7 +89,8 @@
 
       const modelPath = useUnetModels
         ? "UNETLoader.input.required.unet_name[0]"
-        : "CheckpointLoaderSimple.input.required.ckpt_name[0]";
+        : "UNETLoader.input.required.unet_name[0]";
+        //: "CheckpointLoaderSimple.input.required.ckpt_name[0]";
 
       modelOptions = getNestedProperty(data, modelPath) || [];
     } catch (error) {
@@ -122,18 +125,20 @@
 
       // Update model loading node based on workflow
       if (useUnetModels) {
-        prompt["41"].inputs.unet_name = selectedModel;
+        prompt["12"].inputs.unet_name = selectedModel;
       } else {
-        prompt["30"].inputs.ckpt_name = selectedModel;
+        prompt["12"].inputs.unet_name = selectedModel;
+        //load checkpoint
+        //prompt["30"].inputs.ckpt_name = selectedModel;
       }
 
       prompt["6"].inputs.text = positivePrompt;
-      prompt["33"].inputs.text = negativePrompt;
-      prompt["31"].inputs.seed = seed;
-      prompt["31"].inputs.steps = steps;
-      prompt["31"].inputs.cfg = cfg;
-      prompt["40"].inputs.width = selectedSize.split("x")[0];
-      prompt["40"].inputs.height = selectedSize.split("x")[1];
+      //prompt["33"].inputs.text = negativePrompt;
+      prompt["25"].inputs.noise_seed = seed;
+      prompt["17"].inputs.steps = steps;
+      prompt["27"].inputs.guidance = cfg;
+      prompt["5"].inputs.width = selectedSize.split("x")[0];
+      prompt["5"].inputs.height = selectedSize.split("x")[1];
 
       // Queue prompt
       const queueResponse = await fetch(`${apiUrl.origin}/prompt`, {
@@ -168,7 +173,7 @@
           {
             url: imageUrl,
             positivePrompt: positivePrompt,
-            negativePrompt: negativePrompt,
+            //negativePrompt: negativePrompt,
             seed: seed,
             steps: steps,
             cfg: cfg,
@@ -275,20 +280,6 @@
             rows="4"
             class="textarea textarea-bordered textarea-lg w-full"
             placeholder="Describe what you want to generate..."
-          />
-        </div>
-
-        <!-- Negative Prompt -->
-        <div class="form-control mt-4">
-          <label class="label" for="negative-prompt">
-            <span class="label-text font-semibold">Negative Prompt</span>
-          </label>
-          <textarea
-            id="negative-prompt"
-            bind:value={negativePrompt}
-            rows="4"
-            class="textarea textarea-bordered textarea-lg w-full"
-            placeholder="What to exclude from the image..."
           />
         </div>
 
@@ -437,7 +428,6 @@
                 <pre
                   class="text-xs whitespace-pre-wrap p-2 bg-base-200 rounded-box">{`
 Positive: ${positivePrompt}
-Negative: ${negativePrompt}
 Seed: ${seed}
 Steps: ${steps}
 CFG Scale: ${cfg}

@@ -4,7 +4,7 @@
   import unetWorkflow from "./workflows/flux_unet_lora.json";
 
   // props
-  export let useUnetModels = false;
+  export let useCkptModels = false;
   export let serverAddress = "";
 
   // variables
@@ -16,6 +16,9 @@
   let history = [];
   let currentPage = 0;
   let maxPageIndex = 0;
+  let isGenerating = false;
+  let generationCooldown = false;
+  let currentWorkflow = defaultWorkflow;
 
   // Form bindings
   let positivePrompt =
@@ -28,7 +31,6 @@
   let loadingModels = true;
   let selectedSize = "1024x1024";
   let modelOptions = [];
-  let currentWorkflow = defaultWorkflow;
 
   let sizeOptions = [
     { label: "1920x1080", width: 1920, height: 1080 },
@@ -45,7 +47,8 @@
     try {
       const response = await fetch(`${serverAddress}/object_info`);
       const data = await response.json();
-      const models = data.CheckpointLoaderSimple.input.required.ckpt_name[0];
+      const models = data.UNETLoader.input.required.unet_name[0];
+      //const models = data.CheckpointLoaderSimple.input.required.ckpt_name[0];
       modelOptions = models;
     } catch (error) {
       console.error("Error loading models:", error);
@@ -61,10 +64,10 @@
   });
 
   // Reactive statements
-  $: serverAddress, useUnetModels, fetchModels();
+  $: serverAddress, useCkptModels, fetchModels();
   $: {
-    currentWorkflow = useUnetModels ? unetWorkflow : defaultWorkflow;
-    if (useUnetModels) fetchModels(); // Force refresh when toggling
+    currentWorkflow = useCkptModels ? unetWorkflow : defaultWorkflow;
+    if (useCkptModels) fetchModels(); // Force refresh when toggling
   }
   $: prevImages = history.length >= 1 ? history.slice(0, -1).reverse() : [];
   $: maxPageIndex = Math.ceil(prevImages.length / 3) - 1;
@@ -87,10 +90,13 @@
       const response = await fetch(`${serverAddress}/object_info`);
       const data = await response.json();
 
-      const modelPath = useUnetModels
-        ? "UNETLoader.input.required.unet_name[0]"
+      const modelPath = useCkptModels
+        ? "CheckpointLoaderSimple.input.required.ckpt_name[0]"
         : "UNETLoader.input.required.unet_name[0]";
-        //: "CheckpointLoaderSimple.input.required.ckpt_name[0]";
+
+      selectedModel = useCkptModels
+        ? "NewReality_FLUXS1D_Alpha2.safetensors"
+        : "jibMixFlux_v8Accentueight.safetensors";
 
       modelOptions = getNestedProperty(data, modelPath) || [];
     } catch (error) {
@@ -116,6 +122,10 @@
 
   async function generateImage(e) {
     e.preventDefault();
+    if (generationCooldown) return;
+
+    isGenerating = true;
+    generationCooldown = true;
     status = "Generating...";
 
     try {
@@ -124,12 +134,10 @@
       const prompt = structuredClone(currentWorkflow);
 
       // Update model loading node based on workflow
-      if (useUnetModels) {
-        prompt["12"].inputs.unet_name = selectedModel;
+      if (useCkptModels) {
+        prompt["30"].inputs.ckpt_name = selectedModel;
       } else {
         prompt["12"].inputs.unet_name = selectedModel;
-        //load checkpoint
-        //prompt["30"].inputs.ckpt_name = selectedModel;
       }
 
       prompt["6"].inputs.text = positivePrompt;
@@ -157,14 +165,14 @@
 
       // Fetch image data
       const historyResponse = await fetch(
-        `${apiUrl.origin}/history/${promptId}`
+        `${apiUrl.origin}/history/${promptId}`,
       );
       const apiHistory = await historyResponse.json();
       const imgData = apiHistory[promptId]?.outputs?.["9"]?.images?.[0];
 
       if (imgData && imgData.filename) {
         imageUrl = `${apiUrl.origin}/view?filename=${imgData.filename}&subfolder=${encodeURIComponent(
-          imgData.subfolder
+          imgData.subfolder,
         )}&type=${imgData.type}`;
 
         // Update history
@@ -179,14 +187,22 @@
             cfg: cfg,
             size: selectedSize,
             timestamp: Date.now(),
-          }
+          },
         ];
+        isGenerating = false;
+        generationCooldown = false;
         status = "Ready";
       } else {
         throw new Error("Image data not found");
       }
     } catch (err) {
       status = `Error: ${err.message}`;
+      isGenerating = false;
+
+      // Re-enable after 5 seconds
+      setTimeout(() => {
+        generationCooldown = false;
+      }, 5000);
     }
   }
 
@@ -220,7 +236,7 @@
 
       try {
         const historyResponse = await fetch(
-          `${apiUrl.origin}/history/${promptId}`
+          `${apiUrl.origin}/history/${promptId}`,
         );
         const history = await historyResponse.json();
         if (history[promptId]?.outputs?.["9"]?.images?.[0]) {
@@ -350,11 +366,13 @@
           <button
             type="submit"
             class="btn btn-primary w-full"
-            disabled={status !== "Ready"}
+            disabled={generationCooldown || isGenerating}
           >
-            {#if status === "Generating..."}
+            {#if isGenerating}
               <span class="loading loading-spinner"></span>
               Generating
+            {:else if generationCooldown}
+              Cooling Down...
             {:else}
               Generate Image
             {/if}
@@ -383,40 +401,40 @@
             </figure>
 
             {#if prevImages.length > 0}
-                <div class="mt-4">
-                  <div class="flex items-center justify-between">
-                    <!-- Left Arrow -->
-                    <button
-                      on:click={handlePrevPage}
-                      class="btn btn-circle"
-                      disabled={currentPage === 0}
-                    >
-                      ❰
-                    </button>
-  
-                    <!-- Thumbnails -->
-                    <div class="flex gap-4 overflow-hidden">
-                      {#each prevImages.slice(currentPage * 3, currentPage * 3 + 3) as image}
-                        <div class="tooltip" data-tip={image.positivePrompt}>
-                          <img
-                            src={image.url}
-                            class="h-20 w-20 object-cover rounded-box border-2 border-base-300"
-                          />
-                        </div>
-                      {/each}
-                    </div>
-  
-                    <!-- Right Arrow -->
-                    <button
-                      on:click={handleNextPage}
-                      class="btn btn-circle"
-                      disabled={currentPage === maxPageIndex}
-                    >
-                      ❱
-                    </button>
+              <div class="mt-4">
+                <div class="flex items-center justify-between">
+                  <!-- Left Arrow -->
+                  <button
+                    on:click={handlePrevPage}
+                    class="btn btn-circle"
+                    disabled={currentPage === 0}
+                  >
+                    ❰
+                  </button>
+
+                  <!-- Thumbnails -->
+                  <div class="flex gap-4 overflow-hidden">
+                    {#each prevImages.slice(currentPage * 3, currentPage * 3 + 3) as image}
+                      <div class="tooltip" data-tip={image.positivePrompt}>
+                        <img
+                          src={image.url}
+                          class="h-20 w-20 object-cover rounded-box border-2 border-base-300"
+                        />
+                      </div>
+                    {/each}
                   </div>
+
+                  <!-- Right Arrow -->
+                  <button
+                    on:click={handleNextPage}
+                    class="btn btn-circle"
+                    disabled={currentPage === maxPageIndex}
+                  >
+                    ❱
+                  </button>
                 </div>
-              {/if}
+              </div>
+            {/if}
 
             <!-- Metadata Collapse -->
             <div class="collapse collapse-arrow mt-4">

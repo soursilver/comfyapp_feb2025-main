@@ -3,11 +3,11 @@
   const dispatch = createEventDispatcher();
 
   export let currentAddress = "";
-  export let useUnetModels = false;
+  export let useCkptModels = false;
   export let className = "";
 
   let newAddress = currentAddress;
-  let newUseUnetModels = useUnetModels;
+  let newuseCkptModels = useCkptModels;
   let saving = false;
 
   function handleSave() {
@@ -16,7 +16,7 @@
     saving = true;
     dispatch("save", {
       address: newAddress,
-      useUnet: newUseUnetModels,
+      useCkpt: newuseCkptModels,
     });
     setTimeout(() => {
       saving = false;
@@ -41,15 +41,15 @@
       />
     </div>
 
-    <!-- UNET Toggle -->
+    <!-- Ckpt Toggle -->
     <div class="form-control">
       <label class="label cursor-pointer justify-start gap-4">
         <input
           type="checkbox"
-          bind:checked={newUseUnetModels}
+          bind:checked={newuseCkptModels}
           class="toggle toggle-primary"
         />
-        <span class="label-text">Use UNet Models</span>
+        <span class="label-text">Use Checkpoint Models</span>
       </label>
     </div>
 

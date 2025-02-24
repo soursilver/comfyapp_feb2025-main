@@ -24,6 +24,8 @@
   let isGenerating = false;
   let generationCooldown = false;
   let currentWorkflow = defaultWorkflow;
+  let selectedImage = null;
+  let showLightbox = false;
 
   // Form bindings
   //let negativePrompt = "lowres, bad anatomy...";
@@ -100,12 +102,11 @@
         ? "CheckpointLoaderSimple.input.required.ckpt_name[0]"
         : "UNETLoader.input.required.unet_name[0]";
 
-        if (!selectedModel) {
-          selectedModel = useCkptModels
-            ? data.CheckpointLoaderSimple.input.required.ckpt_name[0][0]
-            : data.UNETLoader.input.required.unet_name[0][0];
-        }
-      
+      if (!selectedModel) {
+        selectedModel = useCkptModels
+          ? data.CheckpointLoaderSimple.input.required.ckpt_name[0][0]
+          : data.UNETLoader.input.required.unet_name[0][0];
+      }
 
       modelOptions = getNestedProperty(data, modelPath) || [];
     } catch (error) {
@@ -259,6 +260,25 @@
     }
     throw new Error("Generation timed out");
   }
+
+  function openLightbox(image) {
+    selectedImage = image;
+    showLightbox = true;
+    document.body.classList.add("overflow-hidden");
+  }
+
+  function closeLightbox() {
+    selectedImage = null;
+    showLightbox = false;
+    document.body.classList.remove("overflow-hidden");
+  }
+
+  function downloadImage(url) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "generated_image.png";
+    a.click();
+  }
 </script>
 
 <main class="container mx-auto px-4 py-6">
@@ -403,11 +423,14 @@
 
           <!-- Image Preview -->
           {#if imageUrl}
-            <figure class="flex-1 bg-neutral rounded-box overflow-hidden">
+            <figure
+              class="flex-1 bg-neutral rounded-box overflow-hidden relative cursor-zoom-in"
+            >
               <img
                 src={imageUrl}
                 alt="Generated"
                 class="w-full h-auto object-contain"
+                on:click={() => openLightbox(history[history.length - 1])}
               />
             </figure>
 
@@ -426,7 +449,13 @@
                   <!-- Thumbnails -->
                   <div class="flex gap-4 overflow-hidden">
                     {#each prevImages.slice(currentPage * 3, currentPage * 3 + 3) as image}
-                      <div class="tooltip" data-tip={image.positivePrompt}>
+                      <!-- svelte-ignore a11y-click-events-have-key-events -->
+                      <div
+                        class="tooltip cursor-pointer"
+                        data-tip={image.positivePrompt}
+                        on:click={() => openLightbox(image)}
+                      >
+                        <!-- svelte-ignore a11y-missing-attribute -->
                         <img
                           src={image.url}
                           class="h-20 w-20 object-cover rounded-box border-2 border-base-300"
@@ -471,6 +500,37 @@ CFG Scale: ${cfg}
               <span class="text-neutral-content text-opacity-50">
                 Image will appear here
               </span>
+            </div>
+          {/if}
+          <!-- Lightbox Overlay -->
+          {#if showLightbox && selectedImage}
+            <div
+              class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center lightbox-container"
+            >
+              <div class="relative max-w-4xl max-h-full">
+                <!-- Close Button -->
+                <button
+                  on:click={closeLightbox}
+                  class="absolute top-3 right-3 btn btn-ghost btn-circle btn-sm"
+                >
+                  ✕
+                </button>
+
+                <!-- Download Button -->
+                <button
+                  on:click={() => downloadImage(selectedImage.url)}
+                  class="absolute top-3 left-3 btn btn-primary btn-sm"
+                >
+                  📥
+                </button>
+
+                <!-- Image Container -->
+                <img
+                  src={selectedImage.url}
+                  alt="Generated"
+                  class="rounded-box max-w-full max-h-full object-contain"
+                />
+              </div>
             </div>
           {/if}
         </div>

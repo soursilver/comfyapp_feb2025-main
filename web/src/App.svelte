@@ -3,6 +3,7 @@
   import MainForm from "./MainForm.svelte";
   import Settings from "./Settings.svelte";
 
+  // defaults
   let serverAddress = "http://127.0.0.1:8188";
   let useCkptModels = false;
   let positivePrompt = "Hyperrealistic image of futuristic futuristic scene, realistic style";

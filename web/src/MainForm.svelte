@@ -6,6 +6,11 @@
   // props
   export let useCkptModels = false;
   export let serverAddress = "";
+  export let positivePrompt;
+  export let selectedModel;
+  export let selectedSize;
+  export let steps;
+  export let cfg;
 
   // variables
   let clientId;
@@ -21,15 +26,9 @@
   let currentWorkflow = defaultWorkflow;
 
   // Form bindings
-  let positivePrompt =
-    "Hyperrealistic image of futuristic futuristic scene, realistic style";
   //let negativePrompt = "lowres, bad anatomy...";
   let seed = Math.floor(Math.random() * 1000000000);
-  let steps = 15;
-  let cfg = 3.5;
-  let selectedModel = "NewReality_FLUXS1D_Alpha2.safetensors";
   let loadingModels = true;
-  let selectedSize = "1024x1024";
   let modelOptions = [];
 
   let sizeOptions = [
@@ -41,13 +40,18 @@
   ];
 
   onMount(async () => {
+    if (!serverAddress) return;
     console.log("Server address:", serverAddress);
     clientId = crypto.randomUUID();
-    if (!serverAddress) return;
     try {
       const response = await fetch(`${serverAddress}/object_info`);
       const data = await response.json();
-      const models = data.UNETLoader.input.required.unet_name[0];
+      let models = [];
+      if (useCkptModels) {
+        models = data.CheckpointLoaderSimple.input.required.ckpt_name[0];
+      } else {
+        models = data.UNETLoader.input.required.unet_name[0];
+      }
       //const models = data.CheckpointLoaderSimple.input.required.ckpt_name[0];
       modelOptions = models;
     } catch (error) {
@@ -64,7 +68,9 @@
   });
 
   // Reactive statements
-  $: serverAddress, useCkptModels, fetchModels();
+  $: if (serverAddress && useCkptModels !== undefined) {
+    fetchModels();
+  }
   $: {
     currentWorkflow = useCkptModels ? unetWorkflow : defaultWorkflow;
     if (useCkptModels) fetchModels(); // Force refresh when toggling
@@ -94,9 +100,12 @@
         ? "CheckpointLoaderSimple.input.required.ckpt_name[0]"
         : "UNETLoader.input.required.unet_name[0]";
 
-      selectedModel = useCkptModels
-        ? "NewReality_FLUXS1D_Alpha2.safetensors"
-        : "jibMixFlux_v8Accentueight.safetensors";
+        if (!selectedModel) {
+          selectedModel = useCkptModels
+            ? data.CheckpointLoaderSimple.input.required.ckpt_name[0][0]
+            : data.UNETLoader.input.required.unet_name[0][0];
+        }
+      
 
       modelOptions = getNestedProperty(data, modelPath) || [];
     } catch (error) {

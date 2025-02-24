@@ -72,12 +72,12 @@
   $: prevImages = history.length >= 1 ? history.slice(0, -1).reverse() : [];
   $: maxPageIndex = Math.ceil(prevImages.length / 3) - 1;
 
-  // New function to handle previous page navigation
+  // Handle previous img page navigation
   function handlePrevPage() {
     currentPage = Math.max(currentPage - 1, 0);
   }
 
-  // New function to handle next page navigation
+  // Handle next img page navigation
   function handleNextPage() {
     currentPage = Math.min(currentPage + 1, maxPageIndex);
   }
@@ -107,7 +107,7 @@
     }
   }
 
-  // Add helper function to access nested properties
+  // Helper function to access nested properties
   function getNestedProperty(obj, path) {
     return path.split(".").reduce((acc, part) => {
       const arrayMatch = part.match(/(\w+)\[(\d+)\]/);
@@ -132,6 +132,7 @@
       // Prepare prompt
       const apiUrl = new URL(serverAddress);
       const prompt = structuredClone(currentWorkflow);
+      const currentSeed = seed;
 
       // Update model loading node based on workflow
       if (useCkptModels) {
@@ -191,6 +192,7 @@
         ];
         isGenerating = false;
         generationCooldown = false;
+        seed = Math.floor(Math.random() * 1000000000);
         status = "Ready";
       } else {
         throw new Error("Image data not found");
